@@ -12,15 +12,46 @@ struct serving_t_request {
 };
 
 
-int serving_request_read(int connection_fd, Chaining ** buffer);
-int serving_server_make(serving* server, const int PORT);
-int serving_server_wait(serving* server, int* connection_fd);
+int __request_read(int connection_fd, Chaining ** buffer);
+int __server_make(serving* server, const int PORT);
+int __server_wait(serving* server, int* connection_fd);
 int __parse_request (Chaining* from[static 1], struct serving_t_request * to);
+void __server_free_endpoints (serving* server);
+
+void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
+    if (server_config->endpoints.capacity == 0 || server_config->endpoints.size == 0) {
+        server_config->endpoints.capacity = 0;
+        server_config->endpoints.size = 2;
+
+        server_config->endpoints.methods = calloc(server_config->endpoints.size, sizeof(Chaining_str *));
+        server_config->endpoints.paths = calloc(server_config->endpoints.size, sizeof(Chaining_str *));
+        server_config->endpoints.endpoint_func = calloc(server_config->endpoints.size * sizeof(serving_endpoint_func), sizeof(serving_endpoint_func *));
+    }
+
+    if (server_config->endpoints.capacity == server_config->endpoints.size) {
+        server_config->endpoints.size *= 2;
+        server_config->endpoints.methods = realloc(server_config->endpoints.methods, sizeof(Chaining_str *) * server_config->endpoints.size);
+        server_config->endpoints.paths = realloc(server_config->endpoints.paths, sizeof(Chaining_str *) * server_config->endpoints.size);
+        server_config->endpoints.endpoint_func = realloc(server_config->endpoints.endpoint_func, server_config->endpoints.size * sizeof(serving_endpoint_func*));
+    }
+
+    if (server_config->endpoints.methods == nullptr || server_config->endpoints.paths == nullptr) {
+        perror("Error when allocating memory for methods");
+        exit(1);
+    }
+
+    server_config->endpoints.methods[server_config->endpoints.capacity] = Chaining_new(method);
+    server_config->endpoints.paths[server_config->endpoints.capacity] = Chaining_new(url);
+    server_config->endpoints.endpoint_func[server_config->endpoints.capacity] = endpoint_func;
+    server_config->endpoints.capacity++;
+
+    return;
+}
 
 int serving_server_run (serving* server_config, const int PORT) {
     int connection_fd = -1;
 
-    if(serving_server_make(server_config, PORT)) {
+    if(__server_make(server_config, PORT)) {
         perror("Failed to make server...\n");
         return 1;
     }
@@ -29,12 +60,12 @@ int serving_server_run (serving* server_config, const int PORT) {
         Chaining* raw_request_buffer = Chaining_new("");
         struct serving_t_request raw_request_parsed = {0};
 
-        if(serving_server_wait(server_config, &connection_fd)) {
+        if(__server_wait(server_config, &connection_fd)) {
             perror("ERROR: Failed to launch server...\n");
             break;
         };
 
-        if (serving_request_read(connection_fd, &raw_request_buffer)) {
+        if (__request_read(connection_fd, &raw_request_buffer)) {
             perror("ERROR: Read request failed\n");
             close(connection_fd);
             break;
@@ -53,11 +84,25 @@ int serving_server_run (serving* server_config, const int PORT) {
         free(raw_request_parsed.url);
     } while(false);
 
+
+    __server_free_endpoints(server_config);
     close(server_config->socket);
     return 0;
 }
 
-int serving_server_make(serving* server, const int PORT) {
+void __server_free_endpoints (serving* server) {
+    for (size_t j = 0; j < server->endpoints.capacity; j++) {
+        if(server->endpoints.methods[j] != nullptr)
+            free(server->endpoints.methods[j]);
+        if(server->endpoints.paths[j] != nullptr)
+            free(server->endpoints.paths[j]);
+    }
+    free(server->endpoints.methods);
+    free(server->endpoints.paths);
+    free(server->endpoints.endpoint_func);
+}
+
+int __server_make(serving* server, const int PORT) {
 
     *server = (serving) {
         .domain = AF_INET,
@@ -66,6 +111,7 @@ int serving_server_make(serving* server, const int PORT) {
         .interface = INADDR_ANY,
         .backlog = 10,
         .port = PORT,
+        .endpoints = server->endpoints
     };
 
     server->address.sin_family = server->domain;
@@ -102,22 +148,20 @@ int serving_server_make(serving* server, const int PORT) {
 };
 
 
-int serving_server_wait(serving* server, int* connection_fd) {
+int __server_wait(serving* server, int* connection_fd) {
     int address_length = sizeof(server->address);
+    int socket = server->socket;
+    struct sockaddr* address = (struct sockaddr*)&server->address;
 
     printf("============ WAITING FOR CONNECTION ============\n");
-    if((*connection_fd = accept(
-            server->socket,
-            (struct sockaddr*)&server->address,
-            (socklen_t*)&address_length)) < 0)
-    {
+    if((*connection_fd = accept(socket, address, (socklen_t*)&address_length)) < 0) {
         perror("ERROR: Failed to accept new connection...\n");
         return 1;
     }
     return 0;
 }
 
-int serving_request_read(int connection_fd, Chaining ** buffer) {
+int __request_read(int connection_fd, Chaining ** buffer) {
     int bytes = 1;
     char packet[SERVING_PACKET_SIZE];
 
