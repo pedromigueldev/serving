@@ -1,16 +1,14 @@
 #include "./serving.h"
 #include "chaining.h"
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+
+static Chain_bucket Request_arena;
+static Chain_bucket Endpoints_arena;
 
 struct serving_t_request {
     Chaining * url;
     Chaining * method;
     Chaining * header;
 };
-
 
 int __request_read(int connection_fd, Chaining ** buffer);
 int __server_make(serving* server, const int PORT);
@@ -19,6 +17,9 @@ int __parse_request (Chaining* from[static 1], struct serving_t_request * to);
 void __server_free_endpoints (serving* server);
 
 void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
+    if (Endpoints_arena == nullptr)
+        Endpoints_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 2);
+
     if (server_config->endpoints.capacity == 0 || server_config->endpoints.size == 0) {
         server_config->endpoints.capacity = 0;
         server_config->endpoints.size = 2;
@@ -40,8 +41,8 @@ void serving_endpoint_set(serving* server_config, const char method[static 1], c
         exit(1);
     }
 
-    server_config->endpoints.methods[server_config->endpoints.capacity] = Chaining_new(method);
-    server_config->endpoints.paths[server_config->endpoints.capacity] = Chaining_new(url);
+    server_config->endpoints.methods[server_config->endpoints.capacity] = Chaining_new_arena(&Endpoints_arena, method);
+    server_config->endpoints.paths[server_config->endpoints.capacity] = Chaining_new_arena(&Endpoints_arena, url);
     server_config->endpoints.endpoint_func[server_config->endpoints.capacity] = endpoint_func;
     server_config->endpoints.capacity++;
 
@@ -57,7 +58,9 @@ int serving_server_run (serving* server_config, const int PORT) {
     }
 
     do {
-        Chaining* raw_request_buffer = Chaining_new("");
+        Request_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 2);
+
+        Chaining_str raw_request_buffer = Chaining_new_arena(&Request_arena, "");
         struct serving_t_request raw_request_parsed = {0};
 
         if(__server_wait(server_config, &connection_fd)) {
@@ -78,10 +81,7 @@ int serving_server_run (serving* server_config, const int PORT) {
         }
 
         close(connection_fd);
-        free(raw_request_buffer);
-        free(raw_request_parsed.header);
-        free(raw_request_parsed.method);
-        free(raw_request_parsed.url);
+        Bucket_free(&Request_arena);
     } while(false);
 
 
@@ -91,12 +91,7 @@ int serving_server_run (serving* server_config, const int PORT) {
 }
 
 void __server_free_endpoints (serving* server) {
-    for (size_t j = 0; j < server->endpoints.capacity; j++) {
-        if(server->endpoints.methods[j] != nullptr)
-            free(server->endpoints.methods[j]);
-        if(server->endpoints.paths[j] != nullptr)
-            free(server->endpoints.paths[j]);
-    }
+    Bucket_free(&Endpoints_arena);
     free(server->endpoints.methods);
     free(server->endpoints.paths);
     free(server->endpoints.endpoint_func);
@@ -167,7 +162,7 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 
     do {
         bytes = recv(connection_fd, packet, SERVING_PACKET_SIZE, 0);
-        Chaining_append_raw(buffer, packet, (size_t)bytes);
+        Chaining_append_raw_arena(&Request_arena, buffer, packet, bytes);
     } while ((size_t)bytes >= (*buffer)->size);
 
     if (bytes < 0) {
@@ -181,7 +176,7 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 
 int __parse_request (Chaining* from[static 1], struct serving_t_request * to) {
 
-    CHAINING_STR_AFREE temp = Chaining_clone(from);
+    Chaining_str temp = Chaining_clone_arena(&Request_arena ,from);
     char* url;
     char* head;
     char* method;
@@ -190,7 +185,7 @@ int __parse_request (Chaining* from[static 1], struct serving_t_request * to) {
     head = temp->string;
     head[body-head] = '\0';
 
-    CHAINING_STR_AFREE temp2 = Chaining_clone(from);
+    Chaining_str temp2 = Chaining_clone_arena(&Request_arena ,from);
     char* token = strtok(temp2->string, " ");
     method = token;
 
@@ -198,9 +193,9 @@ int __parse_request (Chaining* from[static 1], struct serving_t_request * to) {
     url = token;
 
     *to = (struct serving_t_request) {
-        .header = Chaining_new(head),
-        .url = Chaining_new(url),
-        .method = Chaining_new(method),
+        .header = Chaining_new_arena(&Request_arena, head),
+        .url = Chaining_new_arena(&Request_arena, url),
+        .method = Chaining_new_arena(&Request_arena, method),
     };
     return 0;
 };

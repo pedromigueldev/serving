@@ -3,10 +3,10 @@
 #include "lib/chaining.h"
 #include "lib/serving.h"
 
-
 void home () {
     printf("Hey\n");
 }
+
 int main (void) {
 	serving server;
 	serving_endpoint_set(&server, "GET", "/", &home);

@@ -9,6 +9,8 @@
 #include <netinet/in.h>
 #include <asm-generic/socket.h>
 #include <stddef.h>
+#include <string.h>
+#include <unistd.h>
 
 #define SERVING_PACKET_SIZE 800
 
