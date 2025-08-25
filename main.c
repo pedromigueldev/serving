@@ -8,7 +8,7 @@ void home () {
 }
 
 int main (void) {
-	serving server;
+	serving server = {0};
 	serving_endpoint_set(&server, "GET", "/", &home);
 	serving_endpoint_set(&server, "POST", "/login", &home);
 	serving_endpoint_set(&server, "PATCH", "/func", &home);

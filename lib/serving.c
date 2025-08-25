@@ -1,8 +1,8 @@
 #include "./serving.h"
 #include "chaining.h"
 
-static Chain_bucket Request_arena;
-static Chain_bucket Endpoints_arena;
+Chain_bucket Request_arena;
+Chain_bucket Endpoints_arena;
 
 struct serving_t_request {
     Chaining * url;
@@ -14,38 +14,15 @@ int __request_read(int connection_fd, Chaining ** buffer);
 int __server_make(serving* server, const int PORT);
 int __server_wait(serving* server, int* connection_fd);
 int __parse_request (Chaining* from[static 1], struct serving_t_request * to);
-void __server_free_endpoints (serving* server);
 
 void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
     if (Endpoints_arena == nullptr)
         Endpoints_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 2);
 
-    if (server_config->endpoints.capacity == 0 || server_config->endpoints.size == 0) {
-        server_config->endpoints.capacity = 0;
-        server_config->endpoints.size = 2;
-
-        server_config->endpoints.methods = calloc(server_config->endpoints.size, sizeof(Chaining_str *));
-        server_config->endpoints.paths = calloc(server_config->endpoints.size, sizeof(Chaining_str *));
-        server_config->endpoints.endpoint_func = calloc(server_config->endpoints.size * sizeof(serving_endpoint_func), sizeof(serving_endpoint_func *));
-    }
-
-    if (server_config->endpoints.capacity == server_config->endpoints.size) {
-        server_config->endpoints.size *= 2;
-        server_config->endpoints.methods = realloc(server_config->endpoints.methods, sizeof(Chaining_str *) * server_config->endpoints.size);
-        server_config->endpoints.paths = realloc(server_config->endpoints.paths, sizeof(Chaining_str *) * server_config->endpoints.size);
-        server_config->endpoints.endpoint_func = realloc(server_config->endpoints.endpoint_func, server_config->endpoints.size * sizeof(serving_endpoint_func*));
-    }
-
-    if (server_config->endpoints.methods == nullptr || server_config->endpoints.paths == nullptr) {
-        perror("Error when allocating memory for methods");
-        exit(1);
-    }
-
-    server_config->endpoints.methods[server_config->endpoints.capacity] = Chaining_new_arena(&Endpoints_arena, method);
-    server_config->endpoints.paths[server_config->endpoints.capacity] = Chaining_new_arena(&Endpoints_arena, url);
-    server_config->endpoints.endpoint_func[server_config->endpoints.capacity] = endpoint_func;
-    server_config->endpoints.capacity++;
-
+    server_config->endpoints.methods[server_config->endpoints.items] = Chaining_new_arena(&Endpoints_arena, method);
+    server_config->endpoints.paths[server_config->endpoints.items] = Chaining_new_arena(&Endpoints_arena, url);
+    server_config->endpoints.endpoint_func[server_config->endpoints.items] = endpoint_func;
+    server_config->endpoints.items++;
     return;
 }
 
@@ -59,7 +36,6 @@ int serving_server_run (serving* server_config, const int PORT) {
 
     do {
         Request_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 2);
-
         Chaining_str raw_request_buffer = Chaining_new_arena(&Request_arena, "");
         struct serving_t_request raw_request_parsed = {0};
 
@@ -84,17 +60,9 @@ int serving_server_run (serving* server_config, const int PORT) {
         Bucket_free(&Request_arena);
     } while(false);
 
-
-    __server_free_endpoints(server_config);
+    Bucket_free(&Endpoints_arena);
     close(server_config->socket);
     return 0;
-}
-
-void __server_free_endpoints (serving* server) {
-    Bucket_free(&Endpoints_arena);
-    free(server->endpoints.methods);
-    free(server->endpoints.paths);
-    free(server->endpoints.endpoint_func);
 }
 
 int __server_make(serving* server, const int PORT) {

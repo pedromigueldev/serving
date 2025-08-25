@@ -19,12 +19,12 @@ typedef struct serving_t serving;
 typedef void (*serving_endpoint_func)(void);
 typedef struct serving_t_endpoints serving_endpoints;
 
+#define MAX_ENDPOINTS_QUANTITY 50
 struct serving_t_endpoints {
-    size_t size;
-    size_t capacity;
-    Chaining_str * methods;
-    Chaining_str * paths;
-    serving_endpoint_func * endpoint_func;
+    size_t items;
+    Chaining_str methods[MAX_ENDPOINTS_QUANTITY];
+    Chaining_str paths[MAX_ENDPOINTS_QUANTITY];
+    serving_endpoint_func endpoint_func[MAX_ENDPOINTS_QUANTITY];
 };
 
 struct serving_t {
