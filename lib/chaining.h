@@ -8,22 +8,28 @@
 #include <string.h>
 #include "./chaining_arena.h"
 
-
+typedef struct Chaining_str_config_t Chaining_str_config;
 typedef struct Chaining_t Chaining;
 typedef Chaining* Chaining_str;
 
 #define CHAINING_STR_AFREE Chaining* __attribute__((__cleanup__(Chaining_free)))
+#define CHAINING_STR_NEW(string, ...) Chaining_new_config((Chaining_str_config) {__VA_ARGS__}, string)
 
 struct Chaining_t {
     size_t size;
     char string[] __attribute__((__counted_by__(size)));
 };
 
+struct Chaining_str_config_t {
+    size_t len;
+    Chain_bucket bucket;
+};
+
 Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1]);
 
+Chaining_str Chaining_new_config (Chaining_str_config config, const char string[static 1]);
 Chaining* Chaining_new(const char string[static 1]);
 Chaining* Chaining_new_len(const char string[static 1], size_t len);
-
 Chaining_str Chaining_new_arena(Chain_bucket bucket[static 1], const char string[static 1]);
 Chaining_str Chaining_new_arena_len(Chain_bucket bucket[static 1], const char string[static 1], size_t len);
 

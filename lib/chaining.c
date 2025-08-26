@@ -24,6 +24,19 @@ Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1])
     return nullptr;
 }
 
+Chaining_str Chaining_new_config (Chaining_str_config config, const char string[static 1]) {
+    if (config.bucket && config.len > 0)
+        return Chaining_new_arena_len(&config.bucket, string, config.len);
+
+    if (config.bucket)
+        return Chaining_new_arena(&config.bucket, string);
+
+    if (config.len > 0)
+        return Chaining_new_len(string, config.len);
+
+    return Chaining_new(string);
+}
+
 Chaining_str Chaining_new_arena(Chain_bucket bucket[static 1], const char string[static 1]) {
     size_t len = strlen(string);
     Chaining_str c = Chain_bucket_alloc(*bucket, sizeof(*c) + len);
