@@ -146,12 +146,10 @@ int __parse_request (Chaining* from[static 1], struct serving_t_request * to) {
 
     Chaining_str temp = Chaining_clone_arena(&Request_arena ,from);
     char* url;
-    char* head;
     char* method;
 
-    char* body = strstr(temp->string, "\r\n\r\n");
-    head = temp->string;
-    head[body-head] = '\0';
+    Chaining_str body = Chaining_look_for(temp, "\r\n\r\n");
+    Chaining_str head = Chaining_new_len(temp->string, temp->size - body->size);
 
     Chaining_str temp2 = Chaining_clone_arena(&Request_arena ,from);
     char* token = strtok(temp2->string, " ");
@@ -161,7 +159,7 @@ int __parse_request (Chaining* from[static 1], struct serving_t_request * to) {
     url = token;
 
     *to = (struct serving_t_request) {
-        .header = Chaining_new_arena(&Request_arena, head),
+        .header = Chaining_new_arena_len(&Request_arena, head->string, head->size),
         .url = Chaining_new_arena(&Request_arena, url),
         .method = Chaining_new_arena(&Request_arena, method),
     };

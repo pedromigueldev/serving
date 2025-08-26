@@ -9,33 +9,20 @@ void Chaining_free(Chaining_str c[static 1]) {
     *c = nullptr;
 };
 
-void Bucket_free(Chain_bucket b[static 1]) {
-    free(*b);
-    *b = nullptr;
-};
+Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1]) {
+    const size_t len = strlen(string);
 
-Chain_bucket Chain_bucket_new(size_t size) {
-    Chain_bucket b = malloc(sizeof(*b) + size);
+    for (size_t i = 0; i < source->size; i++) {
+        for (size_t j = 0; j < len; j++) {
+            if (source->string[i + j] != string[j]) break;
 
-    if(b == nullptr)
-        return nullptr;
+            if(j+1 == len)
+                return Chaining_new_len(&source->string[i], source->size - i);
+        }
+    }
 
-    *b = (Chain_bucket_t) {
-        .size = size
-    };
-
-    return b;
-};
-
-void* Chain_bucket_alloc(Chain_bucket bucket, size_t size) {
-    void *ptr = bucket->data + bucket->capacity;
-
-    if(ptr == nullptr)
-        return nullptr;
-
-    bucket->capacity += size;
-    return ptr;
-};
+    return nullptr;
+}
 
 Chaining_str Chaining_new_arena(Chain_bucket bucket[static 1], const char string[static 1]) {
     size_t len = strlen(string);
@@ -52,8 +39,36 @@ Chaining_str Chaining_new_arena(Chain_bucket bucket[static 1], const char string
     return c;
 };
 
+Chaining_str Chaining_new_arena_len(Chain_bucket bucket[static 1], const char string[static 1], size_t len) {
+    Chaining_str c = Chain_bucket_alloc(*bucket, sizeof(*c) + len);
+
+    if(c == nullptr)
+        return nullptr;
+
+    *c = (Chaining) {
+        .size = len
+    };
+
+    memcpy(c->string, string, len);
+    return c;
+};
+
 Chaining* Chaining_new(const char string[static 1]) {
     size_t len = strlen(string);
+    Chaining* c = malloc(sizeof(*c) + len);
+
+    if(c == nullptr)
+        return nullptr;
+
+    *c = (Chaining) {
+        .size = len
+    };
+
+    memcpy(c->string, string, len);
+    return c;
+}
+
+Chaining* Chaining_new_len(const char string[static 1], size_t len) {
     Chaining* c = malloc(sizeof(*c) + len);
 
     if(c == nullptr)
