@@ -1,8 +1,9 @@
 #include "./serving.h"
 #include "chaining.h"
 
-Chain_bucket Request_arena;
-Chain_bucket Endpoints_arena;
+static Chain_bucket Request_arena;
+static Chain_bucket Endpoints_arena;
+static serving* __server;
 
 struct serving_t_request {
     Chaining * url;
@@ -13,7 +14,7 @@ struct serving_t_request {
 int __request_read(int connection_fd, Chaining ** buffer);
 int __server_make(serving* server, const int PORT);
 int __server_wait(serving* server, int* connection_fd);
-int __parse_request (Chaining* from[static 1], struct serving_t_request * to);
+int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request * to);
 
 void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
     if (Endpoints_arena == nullptr)
@@ -28,8 +29,9 @@ void serving_endpoint_set(serving* server_config, const char method[static 1], c
 
 int serving_server_run (serving* server_config, const int PORT) {
     int connection_fd = -1;
+    __server = server_config;
 
-    if(__server_make(server_config, PORT)) {
+    if(__server_make(__server, PORT)) {
         perror("Failed to make server...\n");
         return 1;
     }
@@ -37,9 +39,8 @@ int serving_server_run (serving* server_config, const int PORT) {
     do {
         Request_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 2);
         Chaining_str raw_request_buffer = Chaining_new_arena(&Request_arena, "");
-        struct serving_t_request raw_request_parsed = {0};
 
-        if(__server_wait(server_config, &connection_fd)) {
+        if(__server_wait(__server, &connection_fd)) {
             perror("ERROR: Failed to launch server...\n");
             break;
         };
@@ -50,7 +51,8 @@ int serving_server_run (serving* server_config, const int PORT) {
             break;
         }
 
-        if (__parse_request(&raw_request_buffer, &raw_request_parsed)) {
+        struct serving_t_request raw_request_parsed = {0};
+        if (__parse_http1_1_request(&raw_request_buffer, &raw_request_parsed)) {
             perror("ERROR: Parse request failed\n");
             close(connection_fd);
             break;
@@ -61,7 +63,7 @@ int serving_server_run (serving* server_config, const int PORT) {
     } while(false);
 
     Bucket_free(&Endpoints_arena);
-    close(server_config->socket);
+    close(__server->socket);
     return 0;
 }
 
@@ -142,7 +144,7 @@ int __request_read(int connection_fd, Chaining ** buffer) {
     return 0;
 }
 
-int __parse_request (Chaining* from[static 1], struct serving_t_request * to) {
+int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request * to) {
 
     Chaining_str temp = Chaining_clone_arena(&Request_arena ,from);
     char* url;
