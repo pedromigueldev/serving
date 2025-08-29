@@ -12,6 +12,9 @@ void Chaining_free(Chaining_str c[static 1]) {
 Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1]) {
     const size_t len = strlen(string);
 
+    if (source->size < len)
+        return nullptr;
+
     for (size_t i = 0; i < source->size; i++) {
         for (size_t j = 0; j < len; j++) {
             if (source->string[i + j] != string[j]) break;
@@ -22,6 +25,26 @@ Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1])
     }
 
     return nullptr;
+}
+
+bool Chaining_includes(Chaining_str source, const char string[static 1]) {
+    const size_t len = strlen(string);
+    size_t match_size = 0;
+
+    if (source->size < len)
+        return false;
+
+    for (size_t i = 0; i < source->size; i++) {
+        for (size_t j = 0; j < len; j++) {
+            if (source->string[i + j] != string[j]) break;
+            match_size++;
+            if(match_size == len)
+                return true;
+        }
+        match_size = 0;
+    }
+
+    return false;
 }
 
 Chaining_str Chaining_new_config (Chaining_str_config config, const char string[static 1]) {
@@ -96,6 +119,8 @@ Chaining* Chaining_new_len(const char string[static 1], size_t len) {
 }
 
 int Chaining_append_raw_arena(Chain_bucket bucket[static 1], Chaining *c[static 1], const char *string, size_t len) {
+    if (len == 0)
+        return 1;
     size_t new_size = (*c)->size + len;
 
     Chaining_str new_string = Chain_bucket_alloc(*bucket, sizeof(**c) + new_size);

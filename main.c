@@ -10,5 +10,5 @@ int main (void) {
 	serving_endpoint_set(&server, "GET", "/", &home);
 	serving_endpoint_set(&server, "POST", "/login", &home);
 	serving_endpoint_set(&server, "PATCH", "/func", &home);
-	return serving_server_run(&server, 6970);
+	return serving_server_run(&server, 6969);
 }
