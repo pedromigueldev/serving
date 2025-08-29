@@ -27,6 +27,11 @@ struct serving_t_request {
         Chaining_str ContentLength;
         Chaining_str ContentType;
         Chaining_str ContentEncoding;
+        Chaining_str Authorization;
+        Chaining_str Connection;
+        Chaining_str Origin;
+        Chaining_str Referer;
+        Chaining_str Cookie;
     } header;
 };
 
@@ -182,7 +187,7 @@ int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request 
     char* url;
     char* method;
 
-    CHAINING_STR_AFREE body = Chaining_look_for(temp, "\r\n\r\n");
+    CHAINING_STR_AFREE body = Chaining_look_for(temp, "\r\n\r\n", false);
     CHAINING_STR_AFREE head = Chaining_new_len(temp->string, temp->size - body->size);
 
     method = strtok(temp->string, " ");
@@ -195,10 +200,10 @@ int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request 
     };
 
     if (
-        (!Chaining_includes(head, "HTTP/1.1"))
-        && (!Chaining_includes(head, "Hostname: "))
-        && (!Chaining_includes(head, "Host: "))
-        && (!Chaining_includes(head, "Content-Length: "))
+        (!Chaining_includes(head, "HTTP/1.1")) &&
+        (!Chaining_includes(head, "Hostname: ")) &&
+        (!Chaining_includes(head, "Host: ")) &&
+        (!Chaining_includes(head, "Content-Length: "))
     ) return 1;
 
     char* token;
@@ -219,6 +224,18 @@ int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request 
             to->header.ContentEncoding = CHAINING_STR_NEW(token, .bucket = Request_arena);
         else if(Chaining_includes(string, "Content-Length: "))
             to->header.ContentLength = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        else if(Chaining_includes(string, "Content-Type: "))
+            to->header.ContentType = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        else if(Chaining_includes(string, "Authorization: "))
+            to->header.Authorization = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        else if(Chaining_includes(string, "Connection: "))
+            to->header.Connection = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        else if(Chaining_includes(string, "Origin: "))
+            to->header.Origin = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        else if(Chaining_includes(string, "Referer: ") || Chaining_includes(string, "Referrer: "))
+            to->header.Referer = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        else if(Chaining_includes(string, "Cookie: "))
+            to->header.Cookie = CHAINING_STR_NEW(token, .bucket = Request_arena);
     }
 
     return 0;

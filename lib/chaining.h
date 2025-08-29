@@ -25,7 +25,7 @@ struct Chaining_str_config_t {
     Chain_bucket bucket;
 };
 
-Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1]);
+Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1], bool include_str);
 bool Chaining_includes(Chaining_str source, const char string[static 1]);
 
 Chaining_str Chaining_new_config (Chaining_str_config config, const char string[static 1]);

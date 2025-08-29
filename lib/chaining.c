@@ -9,8 +9,10 @@ void Chaining_free(Chaining_str c[static 1]) {
     *c = nullptr;
 };
 
-Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1]) {
+
+Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1], bool include_str) {
     const size_t len = strlen(string);
+    size_t match_size = 0;
 
     if (source->size < len)
         return nullptr;
@@ -18,10 +20,14 @@ Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1])
     for (size_t i = 0; i < source->size; i++) {
         for (size_t j = 0; j < len; j++) {
             if (source->string[i + j] != string[j]) break;
-
-            if(j+1 == len)
-                return Chaining_new_len(&source->string[i], source->size - i);
+            match_size++;
+            if(match_size == len) {
+                if (include_str)
+                    return Chaining_new_len(&source->string[i], source->size - i);
+                return Chaining_new_len(&source->string[i + len], source->size - i - len);
+            }
         }
+        match_size = 0;
     }
 
     return nullptr;
