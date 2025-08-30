@@ -10,7 +10,6 @@ all: $(bin)
 
 $(bin): main.o $(libobj)
 	$(cc) $(flags) -o $@ $^
-	./$(bin)
 
 %.o: %.c $(libh)
 	$(cc) $(flags) -c $< -o $@

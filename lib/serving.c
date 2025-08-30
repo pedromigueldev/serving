@@ -3,6 +3,9 @@
 #include "chaining_arena.h"
 #include <errno.h>
 #include <netinet/in.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 
@@ -187,8 +190,13 @@ int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request 
     char* url;
     char* method;
 
-    CHAINING_STR_AFREE body = Chaining_look_for(temp, "\r\n\r\n", false);
+    CHAINING_STR_AFREE body = Chaining_look_for(temp, "\r\n\r\n", true);
     CHAINING_STR_AFREE head = Chaining_new_len(temp->string, temp->size - body->size);
+
+    Chaining_str_array test = Chaining_explode(temp, "\r\n", &Raw_request_arena);
+    for (size_t i = 0; i < test->size; i++) {
+        Chaining_print(test->array[i]);
+    }
 
     method = strtok(temp->string, " ");
     url = strtok(NULL, " ");

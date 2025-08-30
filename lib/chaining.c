@@ -158,6 +158,7 @@ void Chaining_print(const Chaining* c) {
     for (size_t i = 0; i < c->size; i++) {
         putchar(c->string[i]);
     }
+    fflush(stdout);
 }
 
 Chaining_str Chaining_clone_arena(Chain_bucket bucket[static 1], Chaining* c[static 1]) {
@@ -185,3 +186,62 @@ Chaining* Chaining_clone(Chaining* c[static 1]) {
 
     return clone;
 };
+
+int Chaining_append_str_array(Chaining_str_array* c, Chaining_str* string) {
+    if ((*c)->size + 1 == (*c)->capacity) {
+        (*c)->capacity *= 2;
+        *c = realloc(*c, sizeof(**c) + sizeof(Chaining_str) * (*c)->capacity);
+
+        if(*c == nullptr)
+            return -1;
+    }
+
+    (*c)->array[(*c)->size] = *string;
+    (*c)->size++;
+    return 0;
+}
+
+Chaining_str_array Chaining_new_array() {
+    Chaining_str_array str_array = malloc(sizeof(Chaining_str_array) + sizeof(Chaining_str) * 4);
+    if(str_array == nullptr)
+        return nullptr;
+
+    *str_array = (Chaining_array) {
+        .capacity = 4,
+        .size = 0
+    };
+
+    return str_array;
+}
+
+
+Chaining_str_array Chaining_explode(Chaining_str string, const char* delimiters, Chain_bucket bucket[static 1]) {
+    const size_t len = strlen(delimiters);
+    Chaining_str_array str_array = Chaining_new_array();
+
+    for (size_t i = 0; i < string->size; i++) {
+        for (size_t j = 0; j < len; j++) {
+            if (string->string[i] == delimiters[j]) {
+                string->string[i] = '\0';
+            };
+        }
+    }
+
+    size_t count = 0;
+    for (size_t i = 0; i < string->size; i++) {
+        if (string->string[i] == '\0' && count > 0) {
+            if (string->string[i-count] == '\0') {
+                auto temp = CHAINING_STR_NEW(&string->string[i-count+1], .len = count, .bucket = *bucket);
+                Chaining_append_str_array(&str_array, &temp);
+            } else {
+                auto temp = CHAINING_STR_NEW(&string->string[i-count], .len = count, .bucket = *bucket);
+                Chaining_append_str_array(&str_array, &temp);
+            }
+            count = 0;
+            continue;
+        }
+        count++;
+    }
+
+    return str_array;
+}
