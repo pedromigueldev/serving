@@ -204,12 +204,12 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 }
 
 int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination) {
-
+    Chain_bucket temp_bucket = Chain_bucket_new((*source)->size);
     CHAINING_STR_AFREE raw_request_clone = Chaining_clone(source);
     if (raw_request_clone->size < 1)
         return 1;
 
-    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(Request_arena, raw_request_clone, "\r\n", false);
+    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(temp_bucket, raw_request_clone, "\r\n", false);
     if (HTTP1_1Headers_lines == nullptr) {
         return 1;
     }
@@ -272,5 +272,6 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
 
     free(HTTP1_1Headers_lines);
     free(first_line_header);
+    free(temp_bucket);
     return 0;
 };
