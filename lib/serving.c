@@ -209,7 +209,9 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
     if (raw_request_clone->size < 1)
         return 1;
 
-    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(temp_bucket, raw_request_clone, "\r\n", false);
+    Chaining_str body = Chaining_look_for_retarena(Request_arena, raw_request_clone, "\r\n\r\n", false);
+    CHAINING_STR_AFREE headers = CHAINING_STR_NEW(raw_request_clone->string, .len = raw_request_clone->size - body->size);
+    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(temp_bucket, headers, "\r\n", false);
     if (HTTP1_1Headers_lines == nullptr) {
         return 1;
     }
@@ -219,18 +221,8 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
         return 1;
     }
 
-	printf("First line\n");
-    for (size_t i = 0; i < first_line_header->size; i++) {
-        Chaining_print(first_line_header->array[i]);
-        putchar(' ');
-    }
-    printf("\n\nHeaders\n");
-    for (size_t i = 0; i < HTTP1_1Headers_lines->size; i++) {
-        Chaining_println(HTTP1_1Headers_lines->array[i]);
-    }
-
     *destination = (struct serving_t_request) {
-        .body = Chaining_look_for_retarena(Request_arena, raw_request_clone, "\r\n\r\n", false),
+        .body = body,
         .url = first_line_header->array[1],
         .method = first_line_header->array[0],
     };

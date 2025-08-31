@@ -325,7 +325,7 @@ Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str 
                 if (buffer->string[i] == delimiters[j]) {
                     markers++;
                     buffer->string[i] = '\0';
-                    continue;
+                    break;
                 };
                 continue;
             }
