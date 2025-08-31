@@ -12,7 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define SERVING_PACKET_SIZE 800
+#define SERVING_PACKET_SIZE 2048
 
 typedef unsigned long ulong;
 typedef struct serving_t serving;

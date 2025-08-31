@@ -153,7 +153,6 @@ int __request_read(int connection_fd, Chaining ** buffer) {
     int flags = fcntl(connection_fd, F_GETFL, 0);
     fcntl(connection_fd, F_SETFL, flags | O_NONBLOCK);
 
-    do {
         FD_ZERO(&read_fds);
         FD_SET(connection_fd, &read_fds);
 
@@ -165,24 +164,23 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 
         if (activity < 0) {
             perror("select error");
-            break;
         } else if (activity == 0) {
             printf("Timeout occurred, no data available.\n");
-            break;
+        } else if (activity) {
+            do {
+                bytes = recv(connection_fd, packet, sizeof(packet), MSG_DONTWAIT);
+                if (bytes > 0) {
+                    Chaining_append_raw_arena(&Raw_request_arena, buffer, packet, bytes);
+                } else {
+                    if (errno == EAGAIN && errno == EWOULDBLOCK) {
+                        break;
+                    } else {
+                        perror("recv error");
+                        break;
+                    }
+                }
+            } while (1);
         }
-
-        bytes = recv(connection_fd, packet, SERVING_PACKET_SIZE, MSG_DONTWAIT);
-
-        if (bytes > 0) {
-            Chaining_append_raw_arena(&Raw_request_arena, buffer, packet, bytes);
-        } else {
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                perror("recv error");
-                break;
-            }
-        }
-    } while ((size_t)bytes >= (*buffer)->size);
-
     Chaining_print(*buffer);
     return 0;
 }

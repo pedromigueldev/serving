@@ -100,7 +100,7 @@ Chaining_str Chaining_new_config (Chaining_str_config config, const char string[
 
 Chaining_str Chaining_new_arena(Chain_bucket bucket[static 1], const char string[static 1]) {
     size_t len = strlen(string);
-    Chaining_str c = Chain_bucket_alloc(*bucket, sizeof(*c) + len);
+    Chaining_str c = Chain_bucket_alloc(bucket, sizeof(*c) + len);
 
     if(c == nullptr)
         return nullptr;
@@ -114,7 +114,7 @@ Chaining_str Chaining_new_arena(Chain_bucket bucket[static 1], const char string
 };
 
 Chaining_str Chaining_new_arena_len(Chain_bucket bucket[static 1], const char string[static 1], size_t len) {
-    Chaining_str c = Chain_bucket_alloc(*bucket, sizeof(*c) + len);
+    Chaining_str c = Chain_bucket_alloc(bucket, sizeof(*c) + len);
 
     if(c == nullptr)
         return nullptr;
@@ -159,16 +159,19 @@ Chaining_str Chaining_new_len(const char string[static 1], size_t len) {
 int Chaining_append_raw_arena(Chain_bucket bucket[static 1], Chaining *c[static 1], const char *string, size_t len) {
     if (len == 0)
         return 1;
-    size_t new_size = (*c)->size + len;
 
-    Chaining_str new_string = Chain_bucket_alloc(*bucket, sizeof(**c) + new_size);
+    CHAINING_STR_AFREE temp_copy = Chaining_clone(c);
+    size_t new_size = temp_copy->size + len;
+
+    Chaining_str new_string = Chain_bucket_alloc(bucket, sizeof(Chaining_str) + new_size);
+
     if(new_string == nullptr)
         return 1;
 
-    memcpy(new_string->string, (*c)->string, (*c)->size);
-    memcpy(new_string->string + (*c)->size, string, len);
-
     new_string->size = new_size;
+    memcpy(new_string->string, temp_copy->string, temp_copy->size);
+    memcpy(new_string->string + temp_copy->size, string, len);
+
     *c = new_string;
     return 0;
 }
@@ -176,7 +179,7 @@ int Chaining_append_raw_arena(Chain_bucket bucket[static 1], Chaining *c[static 
 int Chaining_append_raw(Chaining *c[static 1], const char *string, size_t len) {
     size_t new_size = (*c)->size + len;
 
-    *c = realloc(*c, sizeof(**c) + new_size);
+    *c = realloc(*c, sizeof(Chaining_str) + new_size);
     if(*c == nullptr)
         return 1;
 
@@ -202,7 +205,7 @@ void Chaining_println(const Chaining_str c) {
 }
 
 Chaining_str Chaining_clone_arena(Chain_bucket bucket[static 1], Chaining_str c[static 1]) {
-    Chaining_str clone = Chain_bucket_alloc(*bucket, sizeof(*clone) + (*c)->size);
+    Chaining_str clone = Chain_bucket_alloc(bucket, sizeof(*clone) + (*c)->size);
     if(clone == nullptr)
         return nullptr;
 

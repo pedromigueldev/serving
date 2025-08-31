@@ -13,8 +13,8 @@ struct Chain_bucket_t_arena {
 };
 
 Chain_bucket Chain_bucket_new(size_t size);
-void* Chain_bucket_alloc(Chain_bucket bucket, size_t size);
-int Chain_bucket_realloc(Chain_bucket bucket, size_t size);
+void* Chain_bucket_alloc(Chain_bucket bucket[static 1], size_t size);
+int Chain_bucket_realloc(Chain_bucket bucket[static 1], size_t size);
 void Bucket_free(Chain_bucket b[static 1]);
 
 #endif

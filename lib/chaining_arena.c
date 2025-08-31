@@ -26,29 +26,29 @@ Chain_bucket Chain_bucket_new(size_t size) {
     return b;
 };
 
-void* Chain_bucket_alloc(Chain_bucket bucket, size_t size) {
+void* Chain_bucket_alloc(Chain_bucket bucket[static 1], size_t size) {
 
-    if(bucket->size + size >= bucket->capacity) {
-        VERIFY_ERR_1(Chain_bucket_realloc(bucket, bucket->size + size + PAGE_SIZE), nullptr);
+    if((*bucket)->size + size >= (*bucket)->capacity) {
+        VERIFY_ERR_1(Chain_bucket_realloc(bucket, (*bucket)->size + size + PAGE_SIZE), nullptr);
     }
 
-    void *ptr = bucket->data + bucket->size;
+    void *ptr = (*bucket)->data + (*bucket)->size;
 
     if(ptr == nullptr)
         return nullptr;
 
-    bucket->size += size;
+    (*bucket)->size += size;
 
     return ptr;
 };
 
-int Chain_bucket_realloc(Chain_bucket bucket, size_t size) {
-    bucket = realloc(bucket, sizeof(*bucket) + size);
+int Chain_bucket_realloc(Chain_bucket bucket[static 1], size_t size) {
+    *bucket = realloc(*bucket, sizeof(**bucket) + size);
 
-    if(bucket == nullptr)
+    if(*bucket == nullptr)
         return 1;
 
-    bucket->capacity = size;
+    (*bucket)->capacity = size;
     return 0;
 }
 
