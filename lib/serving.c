@@ -205,22 +205,22 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 }
 
 int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination) {
-    Chain_bucket temp_bucket = Chain_bucket_new((*source)->size);
+    Chain_bucket Temp_bucket = Chain_bucket_new((*source)->size);
     CHAINING_STR_AFREE raw_request_clone = Chaining_clone(source);
     if (raw_request_clone->size < 1)
         return 1;
 
     Chaining_str body = Chaining_look_for_retarena(Request_arena, raw_request_clone, "\r\n\r\n", false);
     CHAINING_STR_AFREE headers = CHAINING_STR_NEW(raw_request_clone->string, .len = raw_request_clone->size - body->size);
-    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(temp_bucket, headers, "\r\n", false);
-    if (HTTP1_1Headers_lines == nullptr) {
+
+    Chaining_str_array HTTP1_1Headers_lines = {0};
+    if (Chaining_explode_in_bucket(Temp_bucket, headers, &HTTP1_1Headers_lines, "\r\n", false)) {
         return 1;
     }
 
-	Chaining_str_array first_line_header = Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[0], " ", false);
-	if (first_line_header == nullptr || !Chaining_includes(first_line_header->array[2], "HTTP/1.1")) {
-        return 1;
-    }
+	Chaining_str_array first_line_header = {0};
+	if (Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[0], &first_line_header, " ", false) ||
+		!Chaining_includes(first_line_header->array[2], "HTTP/1.1")) return 1;
 
     *destination = (struct serving_t_request) {
         .body = body,
@@ -229,7 +229,8 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
     };
 
     for (size_t i = 0; i < HTTP1_1Headers_lines->size; i++) {
-        Chaining_str_array temp = Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[i], ": ", true);
+        Chaining_str_array temp = {0};
+        Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[i], &temp, ": ", true);
 
         if(Chaining_includes(temp->array[0], "Hostname"))
             destination->header.Hostname = temp->array[1];
@@ -265,6 +266,6 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
 
     free(HTTP1_1Headers_lines);
     free(first_line_header);
-    free(temp_bucket);
+    free(Temp_bucket);
     return 0;
 };

@@ -13,9 +13,9 @@ struct Chaining_t_array {
     Chaining_str array[] __attribute__((__counted_by__(capacity)));
 };
 
-int Chaining_append_str_array(Chaining_str_array c[static 1], Chaining_str string);
+int Chaining_append_array(Chaining_str_array c[static 1], Chaining_str string);
 Chaining_str_array Chaining_new_array();
 Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[static 1], bool strict);
-Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, const char delimiters[static 1], bool strict);
+int Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, Chaining_str_array destination[static 1], const char delimiters[static 1], bool strict) ;
 
 #endif
