@@ -10,40 +10,19 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <sys/select.h>
+#include <unistd.h>
+
 
 static Chain_bucket Raw_request_arena;
 static Chain_bucket Request_arena;
 static Chain_bucket Endpoints_arena;
 static serving* __server;
 
-struct serving_t_request {
-    Chaining * url;
-    Chaining * method;
-    Chaining_str body;
-    struct {
-        Chaining_str header;
-        Chaining_str Host;
-        Chaining_str Hostname;
-        Chaining_str Accept;
-        Chaining_str AcceptEconding;
-        Chaining_str AcceptLanguage;
-        Chaining_str AcceptCharset;
-        Chaining_str UserAgent;
-        Chaining_str ContentLength;
-        Chaining_str ContentType;
-        Chaining_str ContentEncoding;
-        Chaining_str Authorization;
-        Chaining_str Connection;
-        Chaining_str Origin;
-        Chaining_str Referer;
-        Chaining_str Cookie;
-    } header;
-};
-
 int __request_read(int connection_fd, Chaining ** buffer);
 int __server_make(serving* server, const int PORT);
 int __server_wait(serving* server, int* connection_fd);
-int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination);
+int __parse_http1_1_request (Chaining* source[static 1], serving_t_request_http1_1 * destination);
 
 void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
     if (Endpoints_arena == nullptr)
@@ -72,20 +51,18 @@ int serving_server_run (serving* server_config, const int PORT) {
         Chaining_str raw_request_buffer = Chaining_new_arena(&Raw_request_arena, "");
         if(__server_wait(__server, &connection_fd)) {
             perror("ERROR: Failed to launch server...\n");
-            break;
+            goto ret_error;
         };
 
         if (__request_read(connection_fd, &raw_request_buffer)) {
             perror("ERROR: Read request failed\n");
-            close(connection_fd);
-            break;
+            goto ret_error;
         }
 
-        struct serving_t_request raw_request_parsed = {0};
+        serving_t_request_http1_1 raw_request_parsed = {0};
         if (__parse_http1_1_request(&raw_request_buffer, &raw_request_parsed)) {
             perror("ERROR: Parse request failed\n");
-            close(connection_fd);
-            break;
+            goto ret_error;
         }
 
         close(connection_fd);
@@ -96,6 +73,14 @@ int serving_server_run (serving* server_config, const int PORT) {
     Bucket_free(&Endpoints_arena);
     close(__server->socket);
     return 0;
+
+    ret_error:
+    Bucket_free(&Request_arena);
+    Bucket_free(&Raw_request_arena);
+    Bucket_free(&Endpoints_arena);
+    close(connection_fd);
+    close(__server->socket);
+    return 1;
 }
 
 int __server_make(serving* server, const int PORT) {
@@ -143,7 +128,6 @@ int __server_make(serving* server, const int PORT) {
     return 0;
 };
 
-
 int __server_wait(serving* server, int* connection_fd) {
 
     int address_length = sizeof(server->address);
@@ -159,7 +143,6 @@ int __server_wait(serving* server, int* connection_fd) {
     return 0;
 }
 
-#include <sys/select.h>
 int __request_read(int connection_fd, Chaining ** buffer) {
     int bytes = 1;
     char packet[SERVING_PACKET_SIZE];
@@ -175,7 +158,7 @@ int __request_read(int connection_fd, Chaining ** buffer) {
         FD_SET(connection_fd, &read_fds);
 
         timeout = (struct timeval) {
-            .tv_sec = 5
+            .tv_usec = 300000
         };
 
         int activity = select(connection_fd + 1, &read_fds, NULL, NULL, &timeout);
@@ -268,8 +251,8 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
 
     }
 
-    free(HTTP1_1Headers_lines);
-    free(first_line_header);
+    free(HTTP1_1Headers_lines); // temp arrays
+    free(first_line_header);    // temp arrays
     free(Temp_header_bucket);
     return 0;
 };
