@@ -1,6 +1,7 @@
 #include "./serving.h"
 #include "chaining.h"
 #include "chaining_arena.h"
+#include "./chaining_array.h"
 #include <errno.h>
 #include <netinet/in.h>
 #include <stddef.h>
