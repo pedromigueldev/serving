@@ -158,14 +158,35 @@ int __server_wait(serving* server, int* connection_fd) {
     return 0;
 }
 
+#include <sys/select.h>
 int __request_read(int connection_fd, Chaining ** buffer) {
     int bytes = 1;
     char packet[SERVING_PACKET_SIZE];
+
+    fd_set read_fds;
+    struct timeval timeout;
 
     int flags = fcntl(connection_fd, F_GETFL, 0);
     fcntl(connection_fd, F_SETFL, flags | O_NONBLOCK);
 
     do {
+        FD_ZERO(&read_fds);
+        FD_SET(connection_fd, &read_fds);
+
+        timeout = (struct timeval) {
+            .tv_sec = 5
+        };
+
+        int activity = select(connection_fd + 1, &read_fds, NULL, NULL, &timeout);
+
+        if (activity < 0) {
+            perror("select error");
+            break;
+        } else if (activity == 0) {
+            printf("Timeout occurred, no data available.\n");
+            break;
+        }
+
         bytes = recv(connection_fd, packet, SERVING_PACKET_SIZE, MSG_DONTWAIT);
 
         if (bytes > 0) {
@@ -188,12 +209,12 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
     if (raw_request_clone->size < 1)
         return 1;
 
-    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(Request_arena, raw_request_clone, "\r\n");
+    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(Request_arena, raw_request_clone, "\r\n", false);
     if (HTTP1_1Headers_lines == nullptr) {
         return 1;
     }
 
-	Chaining_str_array first_line_header = Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[0], " ");
+	Chaining_str_array first_line_header = Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[0], " ", false);
 	if (first_line_header == nullptr || !Chaining_includes(first_line_header->array[2], "HTTP/1.1")) {
         return 1;
     }
@@ -215,7 +236,7 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
     };
 
     for (size_t i = 0; i < HTTP1_1Headers_lines->size; i++) {
-        Chaining_str_array temp = Chaining_explode(HTTP1_1Headers_lines->array[i], ": ", true);
+        Chaining_str_array temp = Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[i], ": ", true);
 
         if(Chaining_includes(temp->array[0], "Hostname"))
             destination->header.Hostname = temp->array[1];
@@ -243,6 +264,7 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
             destination->header.Referer = temp->array[1];
         else if(Chaining_includes(temp->array[0], "Cookie"))
             destination->header.Cookie = temp->array[1];
+        free(temp);
     }
 
     if (destination->header.Host == nullptr && destination->header.Hostname == nullptr && destination->header.ContentLength == nullptr)

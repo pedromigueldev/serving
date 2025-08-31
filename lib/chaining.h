@@ -35,7 +35,7 @@ struct Chaining_str_config_t {
 };
 int Chaining_append_str_array(Chaining_str_array c[static 1], Chaining_str string);
 Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[static 1], bool strict);
-Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, const char delimiters[static 1]);
+Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, const char delimiters[static 1], bool strict);
 Chaining_str_array Chaining_new_array();
 
 Chaining_str Chaining_look_for_retarena(Chain_bucket bucket, Chaining_str source, const char string[static 1], bool include_str);

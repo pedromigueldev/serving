@@ -74,6 +74,8 @@ bool Chaining_includes(Chaining_str source, const char string[static 1]) {
 
     for (size_t i = 0; i < source->size; i++) {
         for (size_t j = 0; j < len; j++) {
+            if(i + j >= source->size)
+                break;
             if (source->string[i + j] != string[j]) break;
             match_size++;
             if(match_size == len)
@@ -261,15 +263,16 @@ Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[s
     Chaining_str_array str_array = Chaining_new_array();
     CHAINING_STR_AFREE buffer = Chaining_clone(&string);
 
-    // aaa: aaa:11
     for (size_t i = 0; i < buffer->size; i++) {
         for (size_t j = 0; j < len; j++) {
-            if(!strict)
+            if(!strict) {
                 if (buffer->string[i] == delimiters[j]) {
                     markers++;
                     buffer->string[i] = '\0';
                     continue;
                 };
+                continue;
+            }
 
             if (buffer->string[i + j] != delimiters[j]) break;
             match_size++;
@@ -309,18 +312,32 @@ Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[s
     return str_array;
 }
 
-Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, const char delimiters[static 1]) {
+Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, const char delimiters[static 1], bool strict) {
     size_t markers = 0;
+    size_t match_size = 0;
     const size_t len = strlen(delimiters);
     Chaining_str_array str_array = Chaining_new_array();
     CHAINING_STR_AFREE buffer = Chaining_clone(&string);
 
     for (size_t i = 0; i < buffer->size; i++) {
         for (size_t j = 0; j < len; j++) {
-            if (buffer->string[i] == delimiters[j]) {
-                buffer->string[i] = '\0'; markers++;
-            };
+            if(!strict) {
+                if (buffer->string[i] == delimiters[j]) {
+                    markers++;
+                    buffer->string[i] = '\0';
+                    continue;
+                };
+                continue;
+            }
+
+            if (buffer->string[i + j] != delimiters[j]) break;
+            match_size++;
+            markers++;
+            if(match_size == len)
+                for (size_t k = 0; k < len; k++)
+                    buffer->string[i + k] = '\0';
         }
+        match_size = 0;
     }
 
     if (markers == 0) {
