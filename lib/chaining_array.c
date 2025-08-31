@@ -1,4 +1,6 @@
 #include "./chaining_array.h"
+#include "chaining.h"
+#include "chaining_arena.h"
 
 int Chaining_append_array(Chaining_str_array c[static 1], Chaining_str string) {
 
@@ -94,8 +96,16 @@ Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[s
     return str_array;
 }
 
+int Chaining_explode_config(Chaining_explode_config_t config, Chaining_str_array destination[static 1], Chaining_str string, const char delimiters[static 1]) {
+    if (config.bucket == nullptr) {
+        return Chaining_explode_in_bucket(config.bucket, string, destination, delimiters, config.strict);
+    } else if (config.bucket != nullptr) {
+        return Chaining_explode_in_bucket(config.bucket, string, destination, delimiters, config.strict);
+    }
+    return 1;
+}
+
 int Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, Chaining_str_array destination[static 1], const char delimiters[static 1], bool strict) {
-    size_t markers = 0;
     size_t match_size = 0;
     CHAINING_STR_AFREE buffer = Chaining_clone(&string);
     const size_t len = strlen(delimiters);

@@ -214,13 +214,11 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
     CHAINING_STR_AFREE headers = CHAINING_STR_NEW(raw_request_clone->string, .len = raw_request_clone->size - body->size);
 
     Chaining_str_array HTTP1_1Headers_lines = {0};
-    if (Chaining_explode_in_bucket(Temp_bucket, headers, &HTTP1_1Headers_lines, "\r\n", false)) {
-        return 1;
-    }
+    if (CHAIN_EXPLODE(&HTTP1_1Headers_lines, headers, "\r\n", .bucket = Temp_bucket)) return 1;
 
 	Chaining_str_array first_line_header = {0};
-	if (Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[0], &first_line_header, " ", false) ||
-		!Chaining_includes(first_line_header->array[2], "HTTP/1.1")) return 1;
+	if (CHAIN_EXPLODE(&first_line_header, HTTP1_1Headers_lines->array[0], " ", .bucket = Request_arena)) return 1;
+	if (!Chaining_includes(first_line_header->array[2], "HTTP/1.1")) return 1;
 
     *destination = (struct serving_t_request) {
         .body = body,
