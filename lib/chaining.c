@@ -1,14 +1,43 @@
 #include "./chaining.h"
+#include "chaining_arena.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define VERIFY_ERR_1(statement, ...) if(statement) return __VA_ARGS__;
 
 void Chaining_free(Chaining_str c[static 1]) {
     free(*c);
     *c = nullptr;
 };
 
+
+Chaining_str Chaining_look_for_retarena(Chain_bucket bucket, Chaining_str source, const char string[static 1], bool include_str) {
+    const size_t len = strlen(string);
+    size_t match_size = 0;
+
+    if (source->size < len)
+        return nullptr;
+
+    for (size_t i = 0; i < source->size; i++) {
+        for (size_t j = 0; j < len; j++) {
+            if (source->string[i + j] != string[j]) break;
+            match_size++;
+            if(match_size == len) {
+                if (include_str)
+                    return CHAINING_STR_NEW(&source->string[i], .bucket = bucket, .len = source->size - i);
+                if(source->size - i - len > 0)
+                    return CHAINING_STR_NEW(&source->string[i + len], .bucket = bucket, .len = source->size - i - len);
+                else
+                    return CHAINING_STR_NEW("", .bucket = bucket);
+            }
+        }
+        match_size = 0;
+    }
+
+    return nullptr;
+}
 
 Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1], bool include_str) {
     const size_t len = strlen(string);
@@ -24,7 +53,10 @@ Chaining_str Chaining_look_for(Chaining_str source, const char string[static 1],
             if(match_size == len) {
                 if (include_str)
                     return Chaining_new_len(&source->string[i], source->size - i);
-                return Chaining_new_len(&source->string[i + len], source->size - i - len);
+                if(source->size - i - len > 0)
+                    return Chaining_new_len(&source->string[i + len], source->size - i - len);
+                else
+                    return CHAINING_STR_NEW("");
             }
         }
         match_size = 0;
@@ -95,9 +127,9 @@ Chaining_str Chaining_new_arena_len(Chain_bucket bucket[static 1], const char st
     return c;
 };
 
-Chaining* Chaining_new(const char string[static 1]) {
+Chaining_str Chaining_new(const char string[static 1]) {
     size_t len = strlen(string);
-    Chaining* c = malloc(sizeof(*c) + len);
+    Chaining_str c = malloc(sizeof(*c) + len);
 
     if(c == nullptr)
         return nullptr;
@@ -110,8 +142,8 @@ Chaining* Chaining_new(const char string[static 1]) {
     return c;
 }
 
-Chaining* Chaining_new_len(const char string[static 1], size_t len) {
-    Chaining* c = malloc(sizeof(*c) + len);
+Chaining_str Chaining_new_len(const char string[static 1], size_t len) {
+    Chaining_str c = malloc(sizeof(*c) + len);
 
     if(c == nullptr)
         return nullptr;
@@ -154,14 +186,22 @@ int Chaining_append_raw(Chaining *c[static 1], const char *string, size_t len) {
     return 0;
 }
 
-void Chaining_print(const Chaining* c) {
+void Chaining_print(const Chaining_str c) {
     for (size_t i = 0; i < c->size; i++) {
         putchar(c->string[i]);
     }
     fflush(stdout);
 }
 
-Chaining_str Chaining_clone_arena(Chain_bucket bucket[static 1], Chaining* c[static 1]) {
+void Chaining_println(const Chaining_str c) {
+    for (size_t i = 0; i < c->size; i++) {
+        putchar(c->string[i]);
+    }
+    putchar('\n');
+    fflush(stdout);
+}
+
+Chaining_str Chaining_clone_arena(Chain_bucket bucket[static 1], Chaining_str c[static 1]) {
     Chaining_str clone = Chain_bucket_alloc(*bucket, sizeof(*clone) + (*c)->size);
     if(clone == nullptr)
         return nullptr;
@@ -173,8 +213,8 @@ Chaining_str Chaining_clone_arena(Chain_bucket bucket[static 1], Chaining* c[sta
     return clone;
 }
 
-Chaining* Chaining_clone(Chaining* c[static 1]) {
-    Chaining* clone = malloc(sizeof(*clone) + (*c)->size);
+Chaining_str Chaining_clone(Chaining_str c[static 1]) {
+    Chaining_str clone = malloc(sizeof(*clone) + (*c)->size);
 
     if(clone == nullptr)
         return nullptr;
@@ -187,16 +227,16 @@ Chaining* Chaining_clone(Chaining* c[static 1]) {
     return clone;
 };
 
-int Chaining_append_str_array(Chaining_str_array* c, Chaining_str* string) {
-    if ((*c)->size + 1 == (*c)->capacity) {
+int Chaining_append_str_array(Chaining_str_array c[static 1], Chaining_str string) {
+    if ((*c)->size + 2 >= (*c)->capacity) {
         (*c)->capacity *= 2;
         *c = realloc(*c, sizeof(**c) + sizeof(Chaining_str) * (*c)->capacity);
 
         if(*c == nullptr)
-            return -1;
+            return 1;
     }
 
-    (*c)->array[(*c)->size] = *string;
+    (*c)->array[(*c)->size] = string;
     (*c)->size++;
     return 0;
 }
@@ -214,33 +254,98 @@ Chaining_str_array Chaining_new_array() {
     return str_array;
 }
 
-
-Chaining_str_array Chaining_explode(Chaining_str string, const char* delimiters, Chain_bucket bucket[static 1]) {
+Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[static 1], bool strict) {
+    size_t markers = 0;
+    size_t match_size = 0;
     const size_t len = strlen(delimiters);
     Chaining_str_array str_array = Chaining_new_array();
+    CHAINING_STR_AFREE buffer = Chaining_clone(&string);
 
-    for (size_t i = 0; i < string->size; i++) {
+    // aaa: aaa:11
+    for (size_t i = 0; i < buffer->size; i++) {
         for (size_t j = 0; j < len; j++) {
-            if (string->string[i] == delimiters[j]) {
-                string->string[i] = '\0';
-            };
+            if(!strict)
+                if (buffer->string[i] == delimiters[j]) {
+                    markers++;
+                    buffer->string[i] = '\0';
+                    continue;
+                };
+
+            if (buffer->string[i + j] != delimiters[j]) break;
+            match_size++;
+            markers++;
+            if(match_size == len)
+                for (size_t k = 0; k < len; k++)
+                    buffer->string[i + k] = '\0';
         }
+        match_size = 0;
+    }
+
+    if (markers == 0) {
+		VERIFY_ERR_1(Chaining_append_str_array(&str_array, Chaining_clone(&buffer)), nullptr);
+		return str_array;
     }
 
     size_t count = 0;
-    for (size_t i = 0; i < string->size; i++) {
-        if (string->string[i] == '\0' && count > 0) {
-            if (string->string[i-count] == '\0') {
-                auto temp = CHAINING_STR_NEW(&string->string[i-count+1], .len = count, .bucket = *bucket);
-                Chaining_append_str_array(&str_array, &temp);
+    for (size_t i = 0; i < buffer->size; i++) {
+        if (buffer->string[i] == '\0' && count > 0) {
+            if (buffer->string[i-count] == '\0') {
+                auto temp = CHAINING_STR_NEW(&buffer->string[i-count+1], .len = count);
+                VERIFY_ERR_1(Chaining_append_str_array(&str_array, temp), nullptr);
             } else {
-                auto temp = CHAINING_STR_NEW(&string->string[i-count], .len = count, .bucket = *bucket);
-                Chaining_append_str_array(&str_array, &temp);
+                auto temp = CHAINING_STR_NEW(&buffer->string[i-count], .len = count);
+                VERIFY_ERR_1(Chaining_append_str_array(&str_array, temp), nullptr);
             }
             count = 0;
             continue;
         }
         count++;
+		if (i+1 == buffer->size && count > 0) {
+			auto temp = CHAINING_STR_NEW(&string->string[i+1-count], .len = count);
+            VERIFY_ERR_1(Chaining_append_str_array(&str_array, temp), nullptr);
+		}
+    }
+
+    return str_array;
+}
+
+Chaining_str_array Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, const char delimiters[static 1]) {
+    size_t markers = 0;
+    const size_t len = strlen(delimiters);
+    Chaining_str_array str_array = Chaining_new_array();
+    CHAINING_STR_AFREE buffer = Chaining_clone(&string);
+
+    for (size_t i = 0; i < buffer->size; i++) {
+        for (size_t j = 0; j < len; j++) {
+            if (buffer->string[i] == delimiters[j]) {
+                buffer->string[i] = '\0'; markers++;
+            };
+        }
+    }
+
+    if (markers == 0) {
+		VERIFY_ERR_1(Chaining_append_str_array(&str_array, Chaining_clone_arena(&bucket, &buffer)), nullptr);
+		return str_array;
+    }
+
+    size_t count = 0;
+    for (size_t i = 0; i < buffer->size; i++) {
+        if (buffer->string[i] == '\0' && count > 0) {
+            if (buffer->string[i-count] == '\0') {
+                Chaining_str temp = CHAINING_STR_NEW(&buffer->string[i-count+1], .len = count, .bucket = bucket);
+                VERIFY_ERR_1(Chaining_append_str_array(&str_array, temp), nullptr);
+            } else {
+                Chaining_str temp = CHAINING_STR_NEW(&buffer->string[i-count], .len = count, .bucket = bucket);
+                VERIFY_ERR_1(Chaining_append_str_array(&str_array, temp), nullptr);
+            }
+            count = 0;
+            continue;
+        }
+        count++;
+		if (i+1 == buffer->size && count > 0) {
+			Chaining_str temp = CHAINING_STR_NEW(&string->string[i+1-count], .len = count, .bucket = bucket);
+            VERIFY_ERR_1(Chaining_append_str_array(&str_array, temp), nullptr);
+		}
     }
 
     return str_array;

@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -41,7 +42,7 @@ struct serving_t_request {
 int __request_read(int connection_fd, Chaining ** buffer);
 int __server_make(serving* server, const int PORT);
 int __server_wait(serving* server, int* connection_fd);
-int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request * to);
+int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination);
 
 void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
     if (Endpoints_arena == nullptr)
@@ -169,82 +170,85 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 
         if (bytes > 0) {
             Chaining_append_raw_arena(&Raw_request_arena, buffer, packet, bytes);
-        } else if (0 > bytes) {
-            break;
         } else {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 perror("recv error");
                 break;
             }
         }
-
     } while ((size_t)bytes >= (*buffer)->size);
 
     Chaining_print(*buffer);
     return 0;
 }
 
-int __parse_http1_1_request (Chaining* from[static 1], struct serving_t_request * to) {
+int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination) {
 
-    Chaining_str temp = Chaining_clone_arena(&Request_arena ,from);
-    char* url;
-    char* method;
+    CHAINING_STR_AFREE raw_request_clone = Chaining_clone(source);
+    if (raw_request_clone->size < 1)
+        return 1;
 
-    CHAINING_STR_AFREE body = Chaining_look_for(temp, "\r\n\r\n", true);
-    CHAINING_STR_AFREE head = Chaining_new_len(temp->string, temp->size - body->size);
-
-    Chaining_str_array test = Chaining_explode(temp, "\r\n", &Raw_request_arena);
-    for (size_t i = 0; i < test->size; i++) {
-        Chaining_print(test->array[i]);
+    Chaining_str_array HTTP1_1Headers_lines = Chaining_explode_in_bucket(Request_arena, raw_request_clone, "\r\n");
+    if (HTTP1_1Headers_lines == nullptr) {
+        return 1;
     }
 
-    method = strtok(temp->string, " ");
-    url = strtok(NULL, " ");
+	Chaining_str_array first_line_header = Chaining_explode_in_bucket(Request_arena, HTTP1_1Headers_lines->array[0], " ");
+	if (first_line_header == nullptr || !Chaining_includes(first_line_header->array[2], "HTTP/1.1")) {
+        return 1;
+    }
 
-    *to = (struct serving_t_request) {
-        .body = CHAINING_STR_NEW(body->string, .len = body->size, .bucket = Request_arena),
-        .url = CHAINING_STR_NEW(url, .bucket = Request_arena),
-        .method = CHAINING_STR_NEW(method, .bucket = Request_arena),
+	printf("First line\n");
+    for (size_t i = 0; i < first_line_header->size; i++) {
+        Chaining_print(first_line_header->array[i]);
+        putchar(' ');
+    }
+    printf("\n\nHeaders\n");
+    for (size_t i = 0; i < HTTP1_1Headers_lines->size; i++) {
+        Chaining_println(HTTP1_1Headers_lines->array[i]);
+    }
+
+    *destination = (struct serving_t_request) {
+        .body = Chaining_look_for_retarena(Request_arena, raw_request_clone, "\r\n\r\n", false),
+        .url = first_line_header->array[1],
+        .method = first_line_header->array[0],
     };
 
-    if (
-        (!Chaining_includes(head, "HTTP/1.1")) &&
-        (!Chaining_includes(head, "Hostname: ")) &&
-        (!Chaining_includes(head, "Host: ")) &&
-        (!Chaining_includes(head, "Content-Length: "))
-    ) return 1;
+    for (size_t i = 0; i < HTTP1_1Headers_lines->size; i++) {
+        Chaining_str_array temp = Chaining_explode(HTTP1_1Headers_lines->array[i], ": ", true);
 
-    char* token;
-    while ((token = strtok(NULL, "\r\n")) != nullptr) {
-        CHAINING_STR_AFREE string = CHAINING_STR_NEW(token);
-
-        if(Chaining_includes(string, "Host: "))
-            to->header.Host = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Hostname: "))
-            to->header.Hostname = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Accept: "))
-            to->header.Accept = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Accept-Encoding: "))
-            to->header.AcceptEconding = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "User-Agent: "))
-            to->header.UserAgent = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Content-Encoding: "))
-            to->header.ContentEncoding = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Content-Length: "))
-            to->header.ContentLength = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Content-Type: "))
-            to->header.ContentType = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Authorization: "))
-            to->header.Authorization = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Connection: "))
-            to->header.Connection = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Origin: "))
-            to->header.Origin = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Referer: ") || Chaining_includes(string, "Referrer: "))
-            to->header.Referer = CHAINING_STR_NEW(token, .bucket = Request_arena);
-        else if(Chaining_includes(string, "Cookie: "))
-            to->header.Cookie = CHAINING_STR_NEW(token, .bucket = Request_arena);
+        if(Chaining_includes(temp->array[0], "Hostname"))
+            destination->header.Hostname = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Host"))
+            destination->header.Host = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Accept-Encoding"))
+            destination->header.AcceptEconding = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Accept"))
+            destination->header.Accept = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "User-Agent"))
+            destination->header.UserAgent = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Content-Encoding"))
+            destination->header.ContentEncoding = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Content-Length"))
+            destination->header.ContentLength = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Content-Type"))
+            destination->header.ContentType = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Authorization"))
+            destination->header.Authorization = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Connection"))
+            destination->header.Connection = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Origin"))
+            destination->header.Origin = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Referer") || Chaining_includes(temp->array[0], "Referrer"))
+            destination->header.Referer = temp->array[1];
+        else if(Chaining_includes(temp->array[0], "Cookie"))
+            destination->header.Cookie = temp->array[1];
     }
 
+    if (destination->header.Host == nullptr && destination->header.Hostname == nullptr && destination->header.ContentLength == nullptr)
+        return 1;
+
+    free(HTTP1_1Headers_lines);
+    free(first_line_header);
     return 0;
 };
