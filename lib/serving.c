@@ -205,23 +205,23 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 }
 
 int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination) {
-    Chain_bucket Temp_bucket = Chain_bucket_new((*source)->size);
+    Chain_bucket Temp_header_bucket = Chain_bucket_new((*source)->size);
     CHAINING_STR_AFREE raw_request_clone = Chaining_clone(source);
     if (raw_request_clone->size < 1)
         return 1;
 
-    Chaining_str body = Chaining_look_for_retarena(Request_arena, raw_request_clone, "\r\n\r\n", false);
+    CHAINING_STR_AFREE body = Chaining_look_for(raw_request_clone, "\r\n\r\n", false);
     CHAINING_STR_AFREE headers = CHAINING_STR_NEW(raw_request_clone->string, .len = raw_request_clone->size - body->size);
 
     Chaining_str_array HTTP1_1Headers_lines = {0};
-    if (CHAIN_EXPLODE(&HTTP1_1Headers_lines, headers, "\r\n", .bucket = Temp_bucket)) return 1;
+    if (CHAIN_EXPLODE(&HTTP1_1Headers_lines, headers, "\r\n", .bucket = Temp_header_bucket)) return 1;
 
 	Chaining_str_array first_line_header = {0};
 	if (CHAIN_EXPLODE(&first_line_header, HTTP1_1Headers_lines->array[0], " ", .bucket = Request_arena)) return 1;
 	if (!Chaining_includes(first_line_header->array[2], "HTTP/1.1")) return 1;
 
-    *destination = (struct serving_t_request) {
-        .body = body,
+
+	*destination = (struct serving_t_request) {
         .url = first_line_header->array[1],
         .method = first_line_header->array[0],
     };
@@ -262,8 +262,14 @@ int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_reques
     if (destination->header.Host == nullptr && destination->header.Hostname == nullptr && destination->header.ContentLength == nullptr)
         return 1;
 
+    if(destination->header.ContentLength != nullptr) {
+        // create atoi function that accepts string size;
+        destination->body = Chaining_clone_arena(&Request_arena, &body);
+
+    }
+
     free(HTTP1_1Headers_lines);
     free(first_line_header);
-    free(Temp_bucket);
+    free(Temp_header_bucket);
     return 0;
 };

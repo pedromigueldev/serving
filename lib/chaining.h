@@ -2,7 +2,9 @@
 #ifndef CHAINING_H
 #define CHAINING_H
 
+#include <limits.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +18,7 @@ typedef Chaining* Chaining_str;
 #define CHAINING_STR_NEW(string, ...) Chaining_new_config((Chaining_str_config) {__VA_ARGS__}, string)
 
 struct Chaining_t {
-    size_t size;
+    uint16_t size;
     char string[] __attribute__((__counted_by__(size)));
 };
 
