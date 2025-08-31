@@ -127,22 +127,14 @@ int Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, Chainin
 
     size_t count = 0;
     for (size_t i = 0; i < buffer->size; i++) {
-        if (buffer->string[i] == '\0' && count > 0) {
-            if (buffer->string[i-count] == '\0') {
-                Chaining_str temp = CHAINING_STR_NEW(&buffer->string[i-count+1], .len = count, .bucket = bucket);
-                VERIFY_ERR_1(Chaining_append_array(destination, temp), 1);
-            } else {
-                Chaining_str temp = CHAINING_STR_NEW(&buffer->string[i-count], .len = count, .bucket = bucket);
-                VERIFY_ERR_1(Chaining_append_array(destination, temp), 1);
-            }
+        auto debug = buffer->string[i];
+        if (debug == '\0' && count > 0) {
+            Chaining_str temp = CHAINING_STR_NEW(&buffer->string[i-count], .len = count, .bucket = bucket);
+            VERIFY_ERR_1(Chaining_append_array(destination, temp), 1);
             count = 0;
             continue;
-        }
+        } else if (debug == '\0' && count == 0) continue;
         count++;
-		if (i+1 == buffer->size && count > 0) {
-			Chaining_str temp = CHAINING_STR_NEW(&string->string[i+1-count], .len = count, .bucket = bucket);
-            VERIFY_ERR_1(Chaining_append_array(destination, temp), 1);
-		}
     }
 
     return 0;
