@@ -13,8 +13,7 @@
 #include <sys/select.h>
 #include <unistd.h>
 
-
-static Chain_bucket Raw_request_arena;
+// static Chain_bucket Raw_request_arena;
 static Chain_bucket Request_arena;
 static Chain_bucket Endpoints_arena;
 static serving* __server;
@@ -46,9 +45,9 @@ int serving_server_run (serving* server_config, const int PORT) {
 
     do {
         Request_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 3);
-        Raw_request_arena = Chain_bucket_new(sizeof(char) * SERVING_PACKET_SIZE * 3);
 
-        Chaining_str raw_request_buffer = Chaining_new_arena(&Raw_request_arena, "");
+        CHAINING_STR_AFREE raw_request_buffer = Chaining_new("");
+
         if(__server_wait(__server, &connection_fd)) {
             perror("ERROR: Failed to launch server...\n");
             goto ret_error;
@@ -67,7 +66,6 @@ int serving_server_run (serving* server_config, const int PORT) {
 
         close(connection_fd);
         Bucket_free(&Request_arena);
-        Bucket_free(&Raw_request_arena);
     } while(false);
 
     Bucket_free(&Endpoints_arena);
@@ -76,7 +74,6 @@ int serving_server_run (serving* server_config, const int PORT) {
 
     ret_error:
     Bucket_free(&Request_arena);
-    Bucket_free(&Raw_request_arena);
     Bucket_free(&Endpoints_arena);
     close(connection_fd);
     close(__server->socket);
@@ -170,7 +167,7 @@ int __request_read(int connection_fd, Chaining ** buffer) {
         do {
             bytes = recv(connection_fd, packet, sizeof(packet), MSG_DONTWAIT);
             if (bytes > 0) {
-                Chaining_append_raw_arena(&Raw_request_arena, buffer, packet, bytes);
+                Chaining_append_raw(buffer, packet, bytes);
             } else {
                 if (errno == EAGAIN && errno == EWOULDBLOCK) {
                     break;
@@ -185,14 +182,10 @@ int __request_read(int connection_fd, Chaining ** buffer) {
     return 0;
 }
 
-int __parse_http1_1_request (Chaining* source[static 1], struct serving_t_request * destination) {
+int __parse_http1_1_request (Chaining_str source[static 1], struct serving_t_request * destination) {
     Chain_bucket Temp_header_bucket = Chain_bucket_new((*source)->size);
-    CHAINING_STR_AFREE raw_request_clone = Chaining_clone(source);
-    if (raw_request_clone->size < 1)
-        return 1;
-
-    CHAINING_STR_AFREE body = Chaining_look_for(raw_request_clone, "\r\n\r\n", false);
-    CHAINING_STR_AFREE headers = CHAINING_STR_NEW(raw_request_clone->string, .len = raw_request_clone->size - body->size);
+    CHAINING_STR_AFREE body = Chaining_look_for((*source), "\r\n\r\n", false);
+    CHAINING_STR_AFREE headers = CHAINING_STR_NEW((*source)->string, .len = (*source)->size - body->size);
 
     Chaining_str_array HTTP1_1Headers_lines = {0};
     if (CHAIN_EXPLODE(&HTTP1_1Headers_lines, headers, "\r\n", .bucket = Temp_header_bucket)) return 1;

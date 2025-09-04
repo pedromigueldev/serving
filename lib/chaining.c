@@ -138,7 +138,7 @@ Chaining_str Chaining_new(const char string[static 1]) {
         .size = len
     };
 
-    memcpy(c->string, string, len);
+    memmove(c->string, string, len);
     return c;
 }
 
@@ -169,8 +169,8 @@ int Chaining_append_raw_arena(Chain_bucket bucket[static 1], Chaining *c[static 
         return 1;
 
     new_string->size = new_size;
-    memcpy(new_string->string, temp_copy->string, temp_copy->size);
-    memcpy(new_string->string + temp_copy->size, string, len);
+    memmove(new_string->string, temp_copy->string, temp_copy->size);
+    memmove(new_string->string + temp_copy->size, string, len);
 
     *c = new_string;
     return 0;
@@ -183,7 +183,7 @@ int Chaining_append_raw(Chaining *c[static 1], const char *string, size_t len) {
     if(*c == nullptr)
         return 1;
 
-    memcpy((*c)->string + (*c)->size, string, len);
+    memmove((*c)->string + (*c)->size, string, len);
     (*c)->size = new_size;
 
     return 0;
