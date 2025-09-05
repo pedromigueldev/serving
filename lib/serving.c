@@ -184,8 +184,14 @@ int __request_read(int connection_fd, Chaining ** buffer) {
 
 int __parse_http1_1_request (Chaining_str source[static 1], struct serving_t_request * destination) {
     Chain_bucket Temp_header_bucket = Chain_bucket_new((*source)->size);
+
     CHAINING_STR_AFREE body = Chaining_look_for((*source), "\r\n\r\n", false);
+    if (body == nullptr)
+        return 1;
+
     CHAINING_STR_AFREE headers = CHAINING_STR_NEW((*source)->string, .len = (*source)->size - body->size);
+    if (headers== nullptr)
+        return 1;
 
     Chaining_str_array HTTP1_1Headers_lines = {0};
     if (CHAIN_EXPLODE(&HTTP1_1Headers_lines, headers, "\r\n", .bucket = Temp_header_bucket)) return 1;
