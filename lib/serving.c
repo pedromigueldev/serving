@@ -45,7 +45,6 @@ int serving_server_run (serving* server_config, const int PORT) {
 
     do {
         Request_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 3);
-
         CHAINING_STR_AFREE raw_request_buffer = Chaining_new("");
 
         if(__server_wait(__server, &connection_fd)) {
