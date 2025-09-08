@@ -20,11 +20,24 @@ typedef void (*serving_endpoint_func)(void);
 typedef struct serving_t_endpoints serving_endpoints;
 typedef struct serving_t_request serving_t_request_http1_1 ;
 
+enum SERVING_METHOD {
+    SERVING_METHOD_GET = 0,
+    SERVING_METHOD_POST,
+    SERVING_METHOD_PUT,
+    SERVING_METHOD_DELETE,
+    SERVING_METHOD_HEAD,
+    SERVING_METHOD_OPTIONS,
+    SERVING_METHOD_TRACE,
+    SERVING_METHOD_CONNECT,
+    SERVING_METHOD_PATCH,
+    SERVING_METHOD_MAX
+};
+
 #define MAX_ENDPOINTS_QUANTITY 50
 struct serving_t_endpoints {
     size_t items;
-    Chaining_str methods[MAX_ENDPOINTS_QUANTITY];
-    Chaining_str paths[MAX_ENDPOINTS_QUANTITY];
+    enum SERVING_METHOD methods[MAX_ENDPOINTS_QUANTITY];
+    chainstr paths[MAX_ENDPOINTS_QUANTITY];
     serving_endpoint_func endpoint_func[MAX_ENDPOINTS_QUANTITY];
 };
 
@@ -38,28 +51,28 @@ struct serving_t {
 struct serving_t_request {
     Chaining * url;
     Chaining * method;
-    Chaining_str body;
+    chainstr body;
     struct {
-        Chaining_str header;
-        Chaining_str Host;
-        Chaining_str Hostname;
-        Chaining_str Accept;
-        Chaining_str AcceptEconding;
-        Chaining_str AcceptLanguage;
-        Chaining_str AcceptCharset;
-        Chaining_str UserAgent;
-        Chaining_str ContentLength;
-        Chaining_str ContentType;
-        Chaining_str ContentEncoding;
-        Chaining_str Authorization;
-        Chaining_str Connection;
-        Chaining_str Origin;
-        Chaining_str Referer;
-        Chaining_str Cookie;
+        chainstr header;
+        chainstr Host;
+        chainstr Hostname;
+        chainstr Accept;
+        chainstr AcceptEconding;
+        chainstr AcceptLanguage;
+        chainstr AcceptCharset;
+        chainstr UserAgent;
+        chainstr ContentLength;
+        chainstr ContentType;
+        chainstr ContentEncoding;
+        chainstr Authorization;
+        chainstr Connection;
+        chainstr Origin;
+        chainstr Referer;
+        chainstr Cookie;
     } header;
 };
 
 int serving_server_run (serving* server_config, const int PORT);
-void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func);
+void serving_endpoint_set(serving* server_config, enum SERVING_METHOD method, const char url[static 1], serving_endpoint_func endpoint_func);
 
 #endif

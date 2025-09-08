@@ -1,7 +1,6 @@
-cc2=gcc
-cc3=~/Downloads/filc-0.670-linux-x86_64/build/bin/clang
-cc=$(filc)
-flags= -std=c23 -Wall -Wextra -Werror -g #-fsanitize=address -fsanitize=bounds
+cc=gcc
+cc1=$(filc)
+flags= -std=c23 -Wall -Wextra -Werror -g -lm #-fsanitize=address -fsanitize=bounds
 libc=$(wildcard **/*.c)
 libh=$(patsubst %.c,%.h, $(libc))
 libobj=$(patsubst %.c,%.o, $(libc))

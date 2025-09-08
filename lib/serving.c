@@ -3,6 +3,7 @@
 #include "chaining_arena.h"
 #include "./chaining_array.h"
 #include <errno.h>
+#include <math.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -23,11 +24,11 @@ int __server_make(serving* server, const int PORT);
 int __server_wait(serving* server, int* connection_fd);
 int __parse_http1_1_request (Chaining* source[static 1], serving_t_request_http1_1 * destination);
 
-void serving_endpoint_set(serving* server_config, const char method[static 1], const char url[static 1], serving_endpoint_func endpoint_func) {
+void serving_endpoint_set(serving* server_config, enum SERVING_METHOD method, const char url[static 1], serving_endpoint_func endpoint_func) {
     if (Endpoints_arena == nullptr)
         Endpoints_arena = Chain_bucket_new(sizeof(char) *  SERVING_PACKET_SIZE * 2);
 
-    server_config->endpoints.methods[server_config->endpoints.items] = Chaining_new_arena(&Endpoints_arena, method);
+    server_config->endpoints.methods[server_config->endpoints.items] = method;
     server_config->endpoints.paths[server_config->endpoints.items] = Chaining_new_arena(&Endpoints_arena, url);
     server_config->endpoints.endpoint_func[server_config->endpoints.items] = endpoint_func;
     server_config->endpoints.items++;
@@ -181,9 +182,20 @@ int __request_read(int connection_fd, Chaining ** buffer) {
     return 0;
 }
 
-int __parse_http1_1_request (Chaining_str source[static 1], struct serving_t_request * destination) {
-    Chain_bucket Temp_header_bucket = Chain_bucket_new((*source)->size);
+int chainstrtoint (chainstr * string) {
+    int result = 0;
+    if ((*string)->size == 0) return 0;
+    for (int i = (*string)->size - 1; i >= 0; i--) {
+        auto n = ((*string)->string[i] - '0');
+        if (n < 0 || n > 9) return -1;
+        result += n * pow(10, (*string)->size - i - 1);
+    };
 
+    return result;
+}
+
+int __parse_http1_1_request (chainstr source[static 1], struct serving_t_request * destination) {
+    Chain_bucket Temp_header_bucket = Chain_bucket_new((*source)->size);
     CHAINING_STR_AFREE body = Chaining_look_for((*source), "\r\n\r\n", false);
     if (body == nullptr)
         return 1;
@@ -241,8 +253,7 @@ int __parse_http1_1_request (Chaining_str source[static 1], struct serving_t_req
     if (destination->header.Host == nullptr && destination->header.Hostname == nullptr && destination->header.ContentLength == nullptr)
         return 1;
 
-    if(destination->header.ContentLength != nullptr) {
-        // create atoi function that accepts string size;
+    if(destination->header.ContentLength != nullptr && chainstrtoint(&destination->header.ContentLength) > 0) {
         destination->body = Chaining_clone_arena(&Request_arena, &body);
 
     }

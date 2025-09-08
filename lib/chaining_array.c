@@ -2,10 +2,10 @@
 #include "chaining.h"
 #include "chaining_arena.h"
 
-int Chaining_append_array(Chaining_str_array c[static 1], Chaining_str string) {
+int Chaining_append_array(Chaining_str_array c[static 1], chainstr string) {
 
     if (*c == nullptr) {
-        *c = malloc(sizeof(Chaining_str_array) + sizeof(Chaining_str) * 4);
+        *c = malloc(sizeof(Chaining_str_array) + sizeof(chainstr) * 4);
         if(*c == nullptr)
             return 1;
 
@@ -17,7 +17,7 @@ int Chaining_append_array(Chaining_str_array c[static 1], Chaining_str string) {
 
     if ((*c)->size + 2 >= (*c)->capacity) {
         (*c)->capacity *= 2;
-        *c = realloc(*c, sizeof(Chaining_str_array) + sizeof(Chaining_str) * (*c)->capacity);
+        *c = realloc(*c, sizeof(Chaining_str_array) + sizeof(chainstr) * (*c)->capacity);
         if(*c == nullptr)
             return 1;
     }
@@ -28,7 +28,7 @@ int Chaining_append_array(Chaining_str_array c[static 1], Chaining_str string) {
 }
 
 Chaining_str_array Chaining_new_array() {
-    Chaining_str_array str_array = malloc(sizeof(Chaining_str_array) + sizeof(Chaining_str) * 4);
+    Chaining_str_array str_array = malloc(sizeof(Chaining_str_array) + sizeof(chainstr) * 4);
     if(str_array == nullptr)
         return nullptr;
 
@@ -40,7 +40,7 @@ Chaining_str_array Chaining_new_array() {
     return str_array;
 }
 
-Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[static 1], bool strict) {
+Chaining_str_array Chaining_explode(chainstr string, const char delimiters[static 1], bool strict) {
     size_t markers = 0;
     size_t match_size = 0;
     Chaining_str_array str_array = {0};
@@ -96,7 +96,7 @@ Chaining_str_array Chaining_explode(Chaining_str string, const char delimiters[s
     return str_array;
 }
 
-int Chaining_explode_config(Chaining_explode_config_t config, Chaining_str_array destination[static 1], Chaining_str string, const char delimiters[static 1]) {
+int Chaining_explode_config(Chaining_explode_config_t config, Chaining_str_array destination[static 1], chainstr string, const char delimiters[static 1]) {
     if (config.bucket == nullptr) {
         return Chaining_explode_in_bucket(config.bucket, string, destination, delimiters, config.strict);
     } else if (config.bucket != nullptr) {
@@ -105,7 +105,7 @@ int Chaining_explode_config(Chaining_explode_config_t config, Chaining_str_array
     return 1;
 }
 
-int Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, Chaining_str_array destination[static 1], const char delimiters[static 1], bool strict) {
+int Chaining_explode_in_bucket(Chain_bucket bucket, chainstr string, Chaining_str_array destination[static 1], const char delimiters[static 1], bool strict) {
     size_t match_size = 0;
     CHAINING_STR_AFREE buffer = Chaining_clone(&string);
     const size_t len = strlen(delimiters);
@@ -133,7 +133,7 @@ int Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, Chainin
     for (size_t i = 0; i < buffer->size; i++) {
         auto debug = buffer->string[i];
         if (debug == '\0' && count > 0) {
-            Chaining_str temp = CHAINING_STR_NEW(&buffer->string[i-count], .len = count, .bucket = bucket);
+            chainstr temp = CHAINING_STR_NEW(&buffer->string[i-count], .len = count, .bucket = bucket);
             if (Chaining_append_array(destination, temp))
                 return 1;
             count = 0;
@@ -142,7 +142,7 @@ int Chaining_explode_in_bucket(Chain_bucket bucket, Chaining_str string, Chainin
         count++;
 
         if (i+1 == buffer->size && count > 0) {
-			Chaining_str temp = CHAINING_STR_NEW(&string->string[i+1-count], .len = count, .bucket = bucket);
+			chainstr temp = CHAINING_STR_NEW(&string->string[i+1-count], .len = count, .bucket = bucket);
 			if (Chaining_append_array(destination, temp))
                 return 1;
 		}
